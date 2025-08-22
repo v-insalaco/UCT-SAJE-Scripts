@@ -1,5 +1,4 @@
-# Test
-# Need to figure out some timings, and hone this overall
+# Note: Make sure to use a course with no other assignments in it!!
 # 
 # Content import from course with only Assignment Group and 5 Assignment Templates in for speed.
 # Imports into all courses in list.
@@ -12,7 +11,7 @@ from tqdm import tqdm
 from datetime import datetime
 start = datetime.now()
 
-with open(os.path.expanduser("~") + r'/testconfig.json') as json_data_file:
+with open(os.path.expanduser("~") + r'/betaconfig.json') as json_data_file:
     configuration = json.load(json_data_file)
     access_token = configuration["canvas"]["access_token"]
     baseurl = "https://"+configuration["canvas"]["host"]+ "/api/v1/"
@@ -21,10 +20,21 @@ csv_file = glob.glob('*.csv')
 if len(csv_file) != 1:
     raise ValueError('should be only one file in the current directory')
 csvfilename = csv_file[0]
-pd.options.display.max_rows = None
 df = pd.read_csv(csvfilename, encoding = 'unicode_escape')
 print(df)
 ##########################
+
+def course_name(parent_course):
+
+    url = f"{baseurl}courses/{parent_course}"
+    r = requests.get(url, headers=header)
+    if r.status_code != requests.codes.ok:
+        print(f"Failed to fetch course_id: {r.status_code} - {r.text}")
+    else:
+        parent_name = r.json()
+        print(f"Course: {parent_course} is: {parent_name['name']}")
+
+    return
 
 def create_content_migration(course_id, parent_course):
 
@@ -36,16 +46,16 @@ def create_content_migration(course_id, parent_course):
     r = requests.post(url, headers=header, json=payload)
     if r.status_code == requests.codes.ok:
         migration = r.json()
-        print(f"Migration shell created in course {course_id} with ID {migration['id']}")
+        print(f"Migration job created in course {course_id} with ID {migration['id']}.")
         return migration['id']
     else:
-        print(f"Failed to create migration: {r.status_code} - {r.text}")
+        print(f"Failed to create migration in {course_id} - Error: {r.status_code} - {r.text}")
         return None
 
 def wait_for_migration(course_id, migration_id):
 
     print(f"Waiting for migration in {course_id}...")
-    time.sleep(45) # no point checking straight away
+    time.sleep(40) # no point checking straight away. But should we wait 40 seconds?
 
     url = f"{baseurl}courses/{course_id}/content_migrations/{migration_id}"
     while True:
@@ -85,7 +95,7 @@ def move_assignment_group_to_top(course_id, group_name):
             payload = {"position": 0}
             patch_r = requests.put(patch_url, headers=header, json=payload)
             if patch_r.status_code == requests.codes.ok:
-                print(f"Also moved Assignment Group '{group_name}' to top spot.")
+                print(f"Moved Assignment Group '{group_name}' to top spot in {course_id}.")
             else:
                 print(f"Failed to move Assignment Group: {patch_r.status_code} - {patch_r.text}")
             return
@@ -93,7 +103,9 @@ def move_assignment_group_to_top(course_id, group_name):
 def main():
 
     group_name = "Assignment Templates"
-    parent_course = 82025
+    parent_course = 83108
+    course_name(parent_course)
+
     error_log = []
 
     with tqdm(total=len(list(df.iterrows()))) as pbar:
