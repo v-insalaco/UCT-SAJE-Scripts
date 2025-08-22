@@ -1,0 +1,206 @@
+# Module Assessment Overview – corrected (CSV no header, no XLSX)
+# ---------------------------------------------------------------
+# - Creates (or uses) a "Module Assessment Overview" module at position 1 (Published)
+# - Creates or updates a "Module Assessment Overview" wiki page (Published)
+# - Inserts the page into the module (avoids duplicate inserts)
+# - Writes a CSV error log if any courses fail (no XLSX used)
+
+import requests, glob, json, os
+import pandas as pd
+from tqdm import tqdm
+from datetime import datetime
+
+def load_config():
+    with open(os.path.expanduser("~") + r'/testconfig.json', 'r', encoding='utf-8') as f:
+        configuration = json.load(f)
+    access_token = configuration["canvas"]["access_token"]
+    baseUrl = "https://" + configuration["canvas"]["host"].rstrip("/") + "/api/v1/courses/"
+    header = {'Authorization': 'Bearer ' + access_token, 'Content-Type': 'application/json'}
+    return configuration, baseUrl, header
+def read_course_ids_from_headerless_csv():
+    csv_files = glob.glob('*.csv')
+    if not csv_files:
+        raise FileNotFoundError("No CSV file found in the current folder.")
+    csvfilename = csv_files[0]
+    # CSV has NO header: take FIRST column as course_id
+    df = pd.read_csv(csvfilename, header=None, dtype=str, encoding='utf-8-sig')
+    if df.empty:
+        raise ValueError("CSV is empty.")
+    return df, csvfilename
+
+def read_html_template():
+    with open("module_assessment_overview_les.html", "r", encoding="utf-8") as f:
+        return f.read()
+
+def list_modules(baseUrl, header, course_id):
+    url = f"{baseUrl}{course_id}/modules"
+    r = requests.get(url, headers=header)
+    if r.status_code == 200:
+        return r.json()
+    return []
+
+def modulecreator(baseUrl, header, course_id):
+    """
+    Create the module at position=1 (top). If it already exists, return its id.
+    """
+    name = 'Module Assessment Overview'
+
+    # First, try to find an existing module with the same name
+    try:
+        mods = list_modules(baseUrl, header, course_id)
+        for m in mods:
+            if m.get('name') == name:
+                print(f'Using existing module in course {course_id}: {name} (id {m["id"]})')
+                return m['id']
+    except Exception:
+        pass
+
+    # Create new module
+    url = f"{baseUrl}{course_id}/modules"
+    payload = {"module": {"name": name, "position": 1, "published": True}}
+    n = requests.post(url, headers=header, json=payload)
+
+    if n.status_code in (200, 201):
+        data = n.json()
+        print('Created module in course %s: %s' % (course_id, data['name']))
+        return data['id']
+    else:
+        print('Failed to create module for course %s - %s' % (course_id, n.status_code))
+        return None
+
+def list_pages(baseUrl, header, course_id):
+    url = f"{baseUrl}{course_id}/pages"
+    r = requests.get(url, headers=header)
+    if r.status_code == 200:
+        return r.json()
+    return []
+
+def create_module_assessment_page(baseUrl, header, course_id, html_content):
+    """
+    Create the page; if it exists, update and return its slug (url).
+    """
+    title = "Module Assessment Overview"
+    url = f"{baseUrl}{course_id}/pages"
+    payload = {"wiki_page": {"title": title, "body": html_content, "published": True}}
+
+    n = requests.post(url, headers=header, json=payload)
+
+    if n.status_code in (200, 201):
+        data = n.json()
+        print('Created wiki page in course %s: %s' % (course_id, data['url']))
+        return data['url']
+
+    # If already exists, find and update it
+    if n.status_code in (400, 409):
+        pages = list_pages(baseUrl, header, course_id)
+        existing = next((p for p in pages if p.get("title") == title), None)
+        if existing:
+            page_url = existing['url']
+            update_url = f"{baseUrl}{course_id}/pages/{page_url}"
+            update_payload = {"wiki_page": {"body": html_content, "published": True}}
+            u = requests.put(update_url, headers=header, json=update_payload)
+            if u.status_code == 200:
+                print('Updated existing wiki page in course %s: %s' % (course_id, page_url))
+                return page_url
+            else:
+                print('Failed to update existing wiki page in course %s - %s' % (course_id, u.status_code))
+                return None
+
+    print('Failed to create wiki page in course %s - %s' % (course_id, n.status_code))
+    return None
+
+def list_module_items(baseUrl, header, course_id, module_id):
+    url = f"{baseUrl}{course_id}/modules/{module_id}/items"
+    r = requests.get(url, headers=header)
+    if r.status_code == 200:
+        return r.json()
+    return []
+
+def insert_page_into_module(baseUrl, header, course_id, module_id, page_url):
+    """
+    Insert page into module; avoid duplicate if already there.
+    """
+    try:
+        items = list_module_items(baseUrl, header, course_id, module_id)
+        for it in items:
+            if it.get("type") == "Page" and it.get("page_url") == page_url:
+                print('Page already in module for course %s (module_item_id %s)' % (course_id, it['id']))
+                return it['id']
+    except Exception:
+        pass
+
+    url = f"{baseUrl}{course_id}/modules/{module_id}/items"
+    payload = {"module_item": {"type": "Page", "page_url": page_url, "published": True}}
+    n = requests.post(url, headers=header, json=payload)
+    if n.status_code in (200, 201):
+        data = n.json()
+        print('Inserted page into module for course %s: module_item_id %s' % (course_id, data['id']))
+        return data['id']
+    else:
+        print('Failed to insert page into module for course %s - %s' % (course_id, n.status_code))
+        return None
+
+def publish_module(baseUrl, header, course_id, module_id):
+    url = f"{baseUrl}{course_id}/modules/{module_id}"
+    payload = {"module": {"published": True}}
+    n = requests.put(url, headers=header, json=payload)
+
+    if n.status_code in (200,):
+        data = n.json()
+        print('Published module %s in course %s' % (data['name'], course_id))
+    else:
+        print('Failed to publish module %s in course %s - %s' % (module_id, course_id, n.status_code))
+
+def main():
+    configuration, baseUrl, header = load_config()
+    print(baseUrl)
+
+    df, csvfilename = read_course_ids_from_headerless_csv()
+    page_html = read_html_template()
+
+    error_log = []
+
+    with tqdm(total=len(df), desc="Processing courses") as pbar:
+        for _, row in df.iterrows():
+            print("\n")
+            course_id = str(row[0]).strip()  # first column as course_id
+
+            try:
+                module_id = modulecreator(baseUrl, header, course_id)
+                if not module_id:
+                    base_host_url = "https://" + configuration["canvas"]["host"].rstrip("/")
+                    course_url = f"{base_host_url}/courses/{course_id}"
+                    error_log.append({'course_id': course_id, 'course_url': course_url, 'error': 'module_create_failed'})
+                    pbar.update(1)
+                    continue
+
+                page_url = create_module_assessment_page(baseUrl, header, course_id, page_html)
+                if not page_url:
+                    base_host_url = "https://" + configuration["canvas"]["host"].rstrip("/")
+                    course_url = f"{base_host_url}/courses/{course_id}"
+                    error_log.append({'course_id': course_id, 'course_url': course_url, 'error': 'page_create_or_update_failed'})
+                    pbar.update(1)
+                    continue
+
+                insert_page_into_module(baseUrl, header, course_id, module_id, page_url)
+                publish_module(baseUrl, header, course_id, module_id)
+
+            except Exception as e:
+                base_host_url = "https://" + configuration["canvas"]["host"].rstrip("/")
+                course_url = f"{base_host_url}/courses/{course_id}"
+                error_log.append({'course_id': course_id, 'course_url': course_url, 'error': str(e)})
+
+            finally:
+                pbar.update(1)
+
+    # Write a simple CSV error log (no XLSX)
+    if error_log:
+        timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M")
+        logname = f"module_assessment_overview_error_log_{timestamp}.csv"
+        pd.DataFrame(error_log).to_csv(logname, index=False, encoding="utf-8")
+        print(f"\n⚠️  Error log saved: {logname}")
+    else:
+        print("\n✅ No errors encountered.")
+
+if __name__ == "__main__":
+    main()
