@@ -39,21 +39,53 @@ LINK_REPLACEMENTS = {
 
 ####################
 
-def extract_styles_from_div(div_tag):
+def extract_styles_from_element(element):
     font_size = None
     color = None
     is_bold = False
 
-    if div_tag and div_tag.has_attr('style'):
-        style_str = div_tag['style']
-        size_match = re.search(r'font-size\s*:\s*([^;]+)', style_str, re.IGNORECASE)
-        color_match = re.search(r'color\s*:\s*([^;]+)', style_str, re.IGNORECASE)
-        if size_match:
-            font_size = size_match.group(1).strip()
-        if color_match:
-            color = color_match.group(1).strip()
+    def get_color_and_size(tag):
+        fs = None
+        col = None
+        if tag.has_attr('style'):
+            style_str = tag['style'].replace(" ", "").lower()
+            size_match = re.search(r'font-size:([^;]+)', style_str)
+            color_match = re.search(r'color:([^;]+)', style_str)
+            if size_match:
+                fs = size_match.group(1).strip()
+            if color_match:
+                col = color_match.group(1).strip()
+        return fs, col
 
-    if div_tag and (div_tag.find('strong') or div_tag.find('b')):
+    # 1️⃣ Check direct children first (like <span> inside <a>)
+    for child in element.find_all(recursive=False):
+        fs, col = get_color_and_size(child)
+        if font_size is None and fs:
+            font_size = fs
+        if color is None and col:
+            color = col
+        if font_size and color:
+            break
+
+    # 2️⃣ Check the element itself
+    fs, col = get_color_and_size(element)
+    if font_size is None and fs:
+        font_size = fs
+    if color is None and col:
+        color = col
+
+    # 3️⃣ Walk up parents if needed
+    current = element.parent
+    while current and (font_size is None or color is None):
+        fs, col = get_color_and_size(current)
+        if font_size is None and fs:
+            font_size = fs
+        if color is None and col:
+            color = col
+        current = current.parent
+
+    # Bold check
+    if element.find('strong') or element.find('b'):
         is_bold = True
 
     return font_size, color, is_bold
@@ -79,7 +111,7 @@ def update_links_in_html(html, course_id):
                     new_href = f"{webBaseUrl}{course_id}/{new_path}"
 
                 parent_div = a.find_parent("div")
-                font_size, color, is_bold = extract_styles_from_div(parent_div)
+                font_size, color, is_bold = extract_styles_from_element(a)
 
                 a['href'] = new_href
 
