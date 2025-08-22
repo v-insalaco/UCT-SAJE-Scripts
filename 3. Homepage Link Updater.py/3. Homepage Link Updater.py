@@ -34,7 +34,8 @@ error_log = []
 LINK_REPLACEMENTS = {
     "/assignments": "/pages/module-assessment-overview",
     "/pages/assessment": "/pages/module-assessment-overview",
-    "/pages/assignments-for-this-module": "/pages/module-assessment-overview",}
+    "/pages/assignments-for-this-module": "/pages/module-assessment-overview",
+    "/pages/assessment-and-feedback": "/pages/module-assessment-overview",}
 
 ####################
 
@@ -62,7 +63,7 @@ def update_links_in_html(html, course_id):
     changed = False
 
     print(f"\n--- Checking links in course {course_id} HTML ---")
-    print(html)
+    
 
     for a in soup.find_all("a", href=True):
         print(f"Checking link: {a['href']}")
