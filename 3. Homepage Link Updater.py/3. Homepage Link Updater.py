@@ -117,9 +117,11 @@ def update_front_page(course_id):
             print(f"   Response (text): {r.text[:500]}")
         return False, f"Failed to fetch front page for course {course_id}", None
     
+    page_data = r.json()
+    front_html_url = page_data.get('html_url', None)
+    html = page_data.get('body', '')
 
-
-    print(f"Front Page Homepage found for course {course_id} at slug: {page_slug}")
+    print(f"Front Page Homepage found for course {course_id}")
     
     updated_html, changed = update_links_in_html(html, course_id)
     
