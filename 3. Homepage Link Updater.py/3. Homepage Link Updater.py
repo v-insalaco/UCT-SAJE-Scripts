@@ -109,14 +109,15 @@ def update_front_page(course_id):
     r = requests.get(front_page_url, headers=header)
     
     if r.status_code != requests.codes.ok:
+        print(f"   URL: {front_page_url}")
+        print(f"   Status: {r.status_code}")
+        try:
+            print(f"   Response: {r.json()}")
+        except Exception:
+            print(f"   Response (text): {r.text[:500]}")
         return False, f"Failed to fetch front page for course {course_id}", None
     
-    page_data = r.json()
-    page_slug = page_data.get('url', None)
-    front_html_url = page_data.get('html_url', None)
-    html = page_data.get('body', '')
 
-    print(html)
 
     print(f"Front Page Homepage found for course {course_id} at slug: {page_slug}")
     
@@ -139,6 +140,12 @@ def update_syllabus(course_id):
     syllabus_url = baseUrl + f"{course_id}?include[]=syllabus_body"
     r = requests.get(syllabus_url, headers=header)
     if r.status_code != requests.codes.ok:
+        print(f"   URL: {syllabus_url}")
+        print(f"   Status: {r.status_code}")
+        try:
+            print(f"   Response: {r.json()}")
+        except Exception:
+            print(f"   Response (text): {r.text[:500]}")
         return False, f"Failed to fetch syllabus for course {course_id}"
 
     default_view = r.json().get('default_view')
@@ -146,7 +153,6 @@ def update_syllabus(course_id):
 
     if default_view == 'syllabus':
         print(f"Syllabus Body Homepage found for course {course_id}")
-        print(f"Syllabus HTML content (first 500 chars):\n{html[:500]}\n...")
 
     updated_html, changed = update_links_in_html(html, course_id)
 
