@@ -1,5 +1,5 @@
 # Module Assessment Overview – corrected (CSV no header, no XLSX)
-# ---------------------------------------------------------------
+# ----------------------------------------------------------------
 # - Creates (or uses) a "Module Assessment Overview" module at position 1 (Published)
 # - Creates or updates a "Module Assessment Overview" wiki page (Published)
 # - Inserts the page into the module (avoids duplicate inserts)
@@ -152,6 +152,7 @@ def publish_module(baseUrl, header, course_id, module_id):
         print('Failed to publish module %s in course %s - %s' % (module_id, course_id, n.status_code))
 
 def main():
+    
     configuration, baseUrl, header = load_config()
     print(baseUrl)
 
