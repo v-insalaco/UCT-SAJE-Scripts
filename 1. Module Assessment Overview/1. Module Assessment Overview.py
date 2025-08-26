@@ -42,13 +42,16 @@ def modulecreator(course_id):
         return None
 
 
-def create_module_assessment_page(course_id, html_content):
+def create_module_assessment_page(course_id, html_file):
+
+    with open(html_file, 'r', encoding='utf-8') as f:
+        html = f.read()
 
     url = f"{baseUrl}{course_id}/pages"
     payload = {
         "wiki_page": {
             "title": "Module Assessment Overview",
-            "body": html_content,
+            "body": html,
             "published": True
         }
     }
@@ -100,6 +103,13 @@ def publish_module(course_id, module_id):
 
 def main():
 
+    html_file_paths = glob.glob('*.html')
+    if len(html_file_paths) != 1:
+        raise ValueError('should be only one HTML file in the current directory')
+    else:
+        html_file = html_file_paths[0]
+    print("Filename:", html_file)
+
     error_log = []
 
     with tqdm(total=len(list(df.iterrows()))) as pbar:
@@ -116,7 +126,7 @@ def main():
                 pbar.update(1)
                 continue
 
-            page_url = create_module_assessment_page(course_id, page_html)
+            page_url = create_module_assessment_page(course_id, html_file)
             if not page_url:
                 pbar.update(1)
                 continue
