@@ -1,11 +1,9 @@
-# Test!
+## Final/All Colleges/V1
 #
 # Post a 10 year future-dated Announcement for use in each course.
-# Can't have draft or unpublished announcements!
 # Announcements are likely be different for each College.
+# Using html file in same folder to create message.
 # Also generate error log to show where this has been unsuccessful.
-#
-# Put this to the group/DE. Set post dates in the future??
 #
 
 import requests, glob, json, os, openpyxl
@@ -76,10 +74,14 @@ def main():
 
     error_log = []
 
-    title = 'Assignment Name'
-    html_file_path = 'announcement.html'
+    html_file_paths = glob.glob('*.html')
+    if len(html_file_paths) != 1:
+        raise ValueError('should be only one HTML file in the current directory')
+    else:
+        html_file_path = html_file_paths[0]
+    print("Filename:", html_file_path)
 
-    print("Variables are hard-coded")
+    title = 'Assignment Name'
     print("Title:", title)
     print("\n")
 
