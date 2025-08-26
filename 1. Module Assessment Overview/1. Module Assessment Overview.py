@@ -21,10 +21,6 @@ print(baseUrl)
 csv_file = glob.glob('*.csv')
 csvfilename = csv_file[0]
 df = pd.read_csv(csvfilename, encoding='unicode_escape')
-
-# Read HTML content from file
-with open("page.html", "r", encoding="utf-8") as f:
-    page_html = f.read()
 #############################
 
 def modulecreator(course_id):
