@@ -1,9 +1,10 @@
-# Draft 1 version done
+# Final/All Colleges/V1
 #
 # Module Assessment Overview script
 # Create 'Module Assessment Overview' Module Header block at position 0 (Published)
-# then create Module Assessment Overview wikipage (Published)
-# and insert this page into the newly created header block within every course
+# then create Module Assessment Overview wikipage (Published) from HTML in folder
+# and insert this page into the newly created header block within every course.
+# This script doesn't use the HTML file name at all, so safe to use any file.
 # Also generate error log to show any missed courses
 
 import requests, glob, json, openpyxl, os
