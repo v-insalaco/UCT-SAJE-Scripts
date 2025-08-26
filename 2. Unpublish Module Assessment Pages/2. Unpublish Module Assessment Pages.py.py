@@ -33,6 +33,7 @@ def load_page_names_from_file(file_path):
         return []
 
 def find_pages_by_names(course_id, page_names, error_log):
+
     url = f"{baseUrl}{course_id}/pages"
     matching_pages = []
     params = {'per_page': 100}
@@ -53,7 +54,8 @@ def find_pages_by_names(course_id, page_names, error_log):
         pages = response.json()
         for page in pages:
             for name in page_names:
-                if name.lower() in page['title'].lower():
+                ##### Find Logic ####
+                if page['title'].strip().lower() in page_names:
                     matching_pages.append(page)
                     break  # avoid duplicate matches
 
@@ -73,7 +75,8 @@ def unpublish_page(course_id, page_url):
 
     r = requests.put(url, headers=header, json=payload)
     if r.status_code == requests.codes.ok:
-        print(f"Unpublished page {page_url} in {course_id}")
+        print(f"Unpublished: {page_url} in {course_id}")
+        print('\n')
     else:
         print(f"Failed to unpublish page {page_url} in {course_id}: {r.status_code} - {r.text}")
 
@@ -88,7 +91,7 @@ def main():
         file_path = input_file_paths[0]
     print("Filename:", file_path)
 
-    page_names = load_page_names_from_file(file_path)
+    page_names = [name.strip().lower() for name in load_page_names_from_file(file_path)]
 
     if not page_names:
         print("No valid page names found in file.")
@@ -106,8 +109,9 @@ def main():
                 matches = find_pages_by_names(course_id, page_names, error_log)
                 if matches:
                     print(f"Found {len(matches)} matching page(s) in {course_id}:")
+                    print('\n')
                     for page in matches:
-                        print(f"- {page['title']} (URL: {page['html_url']})")
+                        print(f"Page Found: {page['title']}")
 
                         unpublish_page(course_id, page['url'])
 
