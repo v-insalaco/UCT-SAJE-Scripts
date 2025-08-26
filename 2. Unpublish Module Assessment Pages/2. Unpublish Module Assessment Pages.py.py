@@ -67,7 +67,6 @@ def find_pages_by_names(course_id, page_names, error_log):
                     break
     return matching_pages
 
-# Optional future logic: Unpublish a page by page_url
 def unpublish_page(course_id, page_url):
     url = f"{baseUrl}{course_id}/pages/{page_url}"
     payload = {"wiki_page": {"published": False}}
@@ -82,7 +81,13 @@ def main():
 
     error_log = []
 
-    file_path = 'names.txt'
+    input_file_paths = glob.glob('*.txt')
+    if len(input_file_paths) != 1:
+        raise ValueError('should be only one txt file in the current directory')
+    else:
+        file_path = input_file_paths[0]
+    print("Filename:", file_path)
+
     page_names = load_page_names_from_file(file_path)
 
     if not page_names:
