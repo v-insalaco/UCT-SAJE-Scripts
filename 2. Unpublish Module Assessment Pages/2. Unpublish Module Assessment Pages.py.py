@@ -8,13 +8,13 @@
 # and Unpublish matching wikipages in a list of courses.
 # Also generate error log to show where this has been unsuccessful.
 
-import requests, glob, json, openpyxl, os
+import requests, glob, json, openpyxl, os, re, unicodedata
 import pandas as pd
 from tqdm import tqdm
 from datetime import datetime
 start = datetime.now()
 
-with open(os.path.expanduser("~") + r'/testconfig.json') as json_data_file:
+with open(os.path.expanduser("~") + r'/betaconfig.json') as json_data_file:
     configuration = json.load(json_data_file)
     access_token = configuration["canvas"]["access_token"]
     baseUrl = "https://" + configuration["canvas"]["host"] + "/api/v1/courses/"
@@ -31,6 +31,19 @@ def load_page_names_from_file(file_path):
     except FileNotFoundError:
         print(f"File not found: {file_path}")
         return []
+
+# Slug helpers
+def slugify_page_list(name: str) -> str:
+    """Convert a page name to a Canvas-style slug."""
+    name = unicodedata.normalize("NFKD", name).encode("ascii", "ignore").decode("ascii")
+    name = name.strip().lower()
+    name = re.sub(r"[^a-z0-9]+", "-", name)
+    name = name.strip("-")
+    return name
+
+def strip_numbers_from_canvas_pages(slug: str) -> str:
+    """Strip numeric suffix from a Canvas slug if present."""
+    return re.sub(r"-\d+$", "", slug)
 
 def find_pages_by_names(course_id, page_names, error_log):
 
@@ -54,11 +67,12 @@ def find_pages_by_names(course_id, page_names, error_log):
 
         pages = response.json()
 
-        ### Find Logic ###
+        ##### Find Logic #####
         for page in pages:
-            if page['title'].strip().lower() in page_names:
+            # Getting Canvas Pages returned from API into same slug format as slugified page_names list
+            canvas_slug = strip_numbers_from_canvas_pages(page['url'])
+            if canvas_slug in page_names:
                 matching_pages.append(page)
-                break  # avoid duplicate matches
 
         # Handle pagination
         url = None
@@ -93,13 +107,15 @@ def main():
         file_path = input_file_paths[0]
     print("Filename:", file_path)
 
-    page_names = [name.strip().lower() for name in load_page_names_from_file(file_path)]
+    # Build slugs upfront from the text file
+    page_names = [slugify_page_list(name) for name in load_page_names_from_file(file_path)]
 
     if not page_names:
         print("No valid page names found in file.")
         return
     else:
-        print(page_names)
+        for i, name in enumerate(page_names, 1):
+            print(f"{i}: {name}")
 
     with tqdm(total=len(list(df.iterrows()))) as pbar:
         for index, row in df.iterrows():
