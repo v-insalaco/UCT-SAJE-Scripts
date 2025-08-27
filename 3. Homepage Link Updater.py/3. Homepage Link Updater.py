@@ -31,11 +31,21 @@ csvfilename = csv_file[0]
 df = pd.read_csv(csvfilename, encoding='unicode_escape')
 error_log = []
 
-LINK_REPLACEMENTS = {
-    "/assignments": "/pages/module-assessment-overview",
-    "/pages/assessment": "/pages/module-assessment-overview",
-    "/pages/assignments-for-this-module": "/pages/module-assessment-overview",
-    "/pages/assessment-and-feedback": "/pages/module-assessment-overview",}
+def load_link_replacements(filename="link_replacements.txt"):
+    replacements = {}
+    with open(filename, "r", encoding="utf-8") as f:
+        for line in f:
+            line = line.strip()
+            if not line or line.startswith("#"):
+                continue  # allow comments and blank lines
+            try:
+                old, new = line.split(",", 1)
+                replacements[old.strip()] = new.strip()
+            except ValueError:
+                print(f"⚠️ Skipping malformed line in {filename}: {line}")
+    return replacements
+
+LINK_REPLACEMENTS = load_link_replacements()
 
 ####################
 

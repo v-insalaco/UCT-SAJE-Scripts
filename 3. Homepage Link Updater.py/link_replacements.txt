@@ -1,0 +1,4 @@
+/assignments,/pages/module-assessment-overview
+/pages/assessment,/pages/module-assessment-overview
+/pages/assignments-for-this-module,/pages/module-assessment-overview
+/pages/assessment-and-feedback,/pages/module-assessment-overview
