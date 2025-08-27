@@ -34,12 +34,13 @@ def load_page_names_from_file(file_path):
 
 def find_pages_by_names(course_id, page_names, error_log):
 
-    url = f"{baseUrl}{course_id}/pages"
     matching_pages = []
+    url = f"{baseUrl}{course_id}/pages"
     params = {'per_page': 100}
 
     while url:
         response = requests.get(url, headers=header, params=params)
+
         if response.status_code != requests.codes.ok:
             print(f"Failed to fetch pages in {course_id}: {response.status_code} - {response.text}")
             base_host_url = "https://" + configuration["canvas"]["host"]
@@ -52,12 +53,12 @@ def find_pages_by_names(course_id, page_names, error_log):
             return None
 
         pages = response.json()
+
+        ### Find Logic ###
         for page in pages:
-            for name in page_names:
-                ##### Find Logic ####
-                if page['title'].strip().lower() in page_names:
-                    matching_pages.append(page)
-                    break  # avoid duplicate matches
+            if page['title'].strip().lower() in page_names:
+                matching_pages.append(page)
+                break  # avoid duplicate matches
 
         # Handle pagination
         url = None
@@ -67,6 +68,7 @@ def find_pages_by_names(course_id, page_names, error_log):
                 if 'rel="next"' in link:
                     url = link[link.find('<')+1:link.find('>')]
                     break
+    
     return matching_pages
 
 def unpublish_page(course_id, page_url):
