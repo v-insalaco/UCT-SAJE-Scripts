@@ -1,7 +1,9 @@
-# 2: Unpublish Module Assessment Pages.py
-# Test - Draft done, logic needs further interrogation
+# Final/All Colleges/V1
 #
-# [Discovery]
+# Logic changed to adjust page_names list and Canvas pages to both use URL slugs.
+# More accurate comparison, and further logic added to be agnostic of '-2' or other Canvas duplicates.
+# Finds all 'base' matches, regardless of trailing number copies returned from Canvas API
+#
 # Find all wikipages and then find whatever Module Assessment information pages exist
 # in all College/School courses by wikipage name.
 # Identify naming conventions picked up from template discovery task,
@@ -121,25 +123,33 @@ def main():
         for index, row in df.iterrows():
             course_id = row['course_id']
             print('\n')
-            print(f"\n Checking course {course_id}...")
+            print(f"\nChecking course {course_id}...")
 
             try:
                 matches = find_pages_by_names(course_id, page_names, error_log)
+
+                if matches is None:
+                    print(f"Course: {course_id} doesn't exist!")
+                    pbar.update(1)
+                    continue
+
                 if matches:
                     print(f"Found {len(matches)} matching page(s) in {course_id}:")
                     print('\n')
                     for page in matches:
                         print(f"Page Found: {page['title']}")
-
                         unpublish_page(course_id, page['url'])
-
                 else:
                     print(f"No matching pages found in {course_id}")
 
             except Exception as e:
                 base_host_url = "https://" + configuration["canvas"]["host"]
                 course_url = f"{base_host_url}/courses/{course_id}"
-                error_log.append({'course_id': course_id, 'URL': course_url, 'Error': str(e)})
+                error_log.append({
+                    'course_id': course_id,
+                    'URL': course_url,
+                    'Error': str(e)
+                })
                 print(f"Error in course {course_id}: {e}")
 
             pbar.update(1)
