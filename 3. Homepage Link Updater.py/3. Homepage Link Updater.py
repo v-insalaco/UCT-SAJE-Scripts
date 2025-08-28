@@ -1,24 +1,20 @@
 # 3. Homepage Link Updater
-# Test
 # Things to sort - don't need double error log!
-# Seems to work alright in draft but sort error log
 # 
 # Find the homepage or front page of a course that’s used as the chosen homepage,
-# and on this identified page find the link/button link text from the template discovery task
+# and on this identified page find the link/button link text from the template discovery task loaded via text file
 # that corresponds with how this College, School or Department deals with Module Assessment/Assessment & Feedback.
-# Where this does not point towards our previously created Module Assessment Overview page (script 1),
-# change this to point to the Module Assessment Overview wikipage.
-# Error log too
+# Change this to point to the Module Assessment Overview wikipage.
+# Error log created for invalid courses.
 
-import requests, glob, json, os
+import requests, glob, json, os, re, openpyxl
 import pandas as pd
 from tqdm import tqdm
 from datetime import datetime
 from bs4 import BeautifulSoup
-import re
 start = datetime.now()
 
-with open(os.path.expanduser("~") + r'/testconfig.json') as f:
+with open(os.path.expanduser("~") + r'/betaconfig.json') as f:
     configuration = json.load(f)
     access_token = configuration["canvas"]["access_token"]
     baseUrl = "https://" + configuration["canvas"]["host"] + "/api/v1/courses/"
@@ -30,6 +26,8 @@ csv_file = glob.glob('*.csv')
 csvfilename = csv_file[0]
 df = pd.read_csv(csvfilename, encoding='unicode_escape')
 error_log = []
+
+#####################
 
 def load_link_replacements(filename="link_replacements.txt"):
     replacements = {}
@@ -46,8 +44,6 @@ def load_link_replacements(filename="link_replacements.txt"):
     return replacements
 
 LINK_REPLACEMENTS = load_link_replacements()
-
-####################
 
 def extract_styles_from_element(element):
     font_size = None
@@ -215,43 +211,41 @@ def update_syllabus(course_id):
         return True, None
     
 def check_homepage_type(course_id):
-    """Fetch course details and print default_view."""
+    """Fetch course details and return default_view, or None if invalid."""
     course_url = baseUrl + f"{course_id}"
     r = requests.get(course_url, headers=header)
     if r.status_code != requests.codes.ok:
         print(f"⚠️ Failed to fetch course {course_id} details: {r.status_code}")
-        # Correct dictionary syntax for append
-        error_log.append({'course_id': course_id, 'URL': f"{webBaseUrl}{course_id}"})
-        return None
+        return None  # ❌ don't append here — let main() handle logging
 
     course_data = r.json()
-    default_view = course_data.get('default_view', 'unknown')
-    print(f"Course {course_id} - default_view: {default_view}")
-
-    return default_view
+    return course_data.get('default_view', 'unknown')
 
 def main():
 
     with tqdm(total=len(df), desc="Updating courses") as pbar:
         for _, row in df.iterrows():
             course_id = row['course_id']
-            course_url = f"{webBaseUrl}{course_id}"  # default fallback URL
+            course_url = f"{webBaseUrl}{course_id}"
             print('\n')
 
             try:
                 default_view = check_homepage_type(course_id)
 
+                if default_view is None:
+                    # Invalid course → log once and skip
+                    error_log.append({'course_id': course_id, 'URL': course_url, 'Error': "Invalid course ID"})
+                    pbar.update(1)
+                    continue
+
                 if default_view == 'wiki':
-                    print('\n')
-                    print(f"Calling update_front_page for course {course_id}")
+                    print(f"\nCalling update_front_page for course {course_id}")
                     success, msg, front_html_url = update_front_page(course_id)
-                    # Use front_html_url if returned
                     if front_html_url:
                         course_url = front_html_url
 
                 elif default_view == 'syllabus':
-                    print('\n')
-                    print(f"Calling update_syllabus for course {course_id}")
+                    print(f"\nCalling update_syllabus for course {course_id}")
                     success, msg = update_syllabus(course_id)
 
                 else:
@@ -259,12 +253,10 @@ def main():
                     msg = f"Unknown default_view: {default_view}"
 
                 if not success:
-                    error_log.append({'course_id': course_id, 'URL': course_url})
-                    if msg:
-                        print(f"⚠️ {msg}")
+                    error_log.append({'course_id': course_id, 'URL': course_url, 'Error': msg})
 
             except Exception as e:
-                error_log.append({'course_id': course_id, 'URL': course_url})
+                error_log.append({'course_id': course_id, 'URL': course_url, 'Error': str(e)})
                 print(f"⚠️ Exception in course {course_id}: {e}")
 
             pbar.update(1)
@@ -273,9 +265,27 @@ def main():
     if error_log:
         df_errors = pd.DataFrame(error_log)
         timestamp = datetime.now().strftime("%d-%m-%Y %H-%M")
-        ssname = f"update_links_error_log_{timestamp}.xlsx"
+        ssname = f"module_assessment_overview_error_log_{timestamp}.xlsx"
         df_errors.to_excel(ssname, header=True, index=False)
-        print(f"\nError log saved as: {ssname}")
+
+        # Excel file formatting
+        wb = openpyxl.load_workbook(ssname)
+        ws = wb.active
+
+        for column_cells in ws.columns:
+            max_length = 0
+            column_letter = column_cells[0].column_letter
+            for cell in column_cells:
+                try:
+                    if cell.value:
+                        max_length = max(max_length, len(str(cell.value)))
+                except:
+                    pass
+            adjusted_width = max_length + 5
+            ws.column_dimensions[column_letter].width = adjusted_width
+
+        wb.save(ssname)
+        print("\nError log saved as: %s" % ssname)
     else:
         print("\nNo errors encountered.")
 
