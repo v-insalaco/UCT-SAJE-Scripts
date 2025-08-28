@@ -1,5 +1,5 @@
+# Final/All Colleges/V1
 # 3. Homepage Link Updater
-# Things to sort - don't need double error log!
 # 
 # Find the homepage or front page of a course that’s used as the chosen homepage,
 # and on this identified page find the link/button link text from the template discovery task loaded via text file
@@ -265,7 +265,7 @@ def main():
     if error_log:
         df_errors = pd.DataFrame(error_log)
         timestamp = datetime.now().strftime("%d-%m-%Y %H-%M")
-        ssname = f"module_assessment_overview_error_log_{timestamp}.xlsx"
+        ssname = f"homepage_link_updater_error_log_{timestamp}.xlsx"
         df_errors.to_excel(ssname, header=True, index=False)
 
         # Excel file formatting
