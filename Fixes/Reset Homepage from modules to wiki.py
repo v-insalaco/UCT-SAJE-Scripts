@@ -1,4 +1,5 @@
 # Attempt to fix the homepage issue occurred!
+# Works to find only the default_view = modules entries, and change them to wiki (front page)
 
 import os, json, glob, requests, openpyxl
 import pandas as pd
@@ -6,7 +7,7 @@ from tqdm import tqdm
 from datetime import datetime
 start = datetime.now()
 
-with open(os.path.expanduser("~") + r'/testconfig.json') as json_data_file:
+with open(os.path.expanduser("~") + r'/config.json') as json_data_file:
     configuration = json.load(json_data_file)
     access_token = configuration["canvas"]["access_token"]
     baseUrl = "https://" + configuration["canvas"]["host"] + "/api/v1/courses/"
@@ -16,6 +17,7 @@ print(baseUrl)
 csv_file = glob.glob('*.csv')
 csvfilename = csv_file[0]
 df = pd.read_csv(csvfilename, encoding='unicode_escape')
+error_log = []
 
 #############################
 
@@ -27,6 +29,7 @@ def get_course_default_view(course_id):
         return r.json().get('default_view')
     else:
         print(f"[ERROR] Could not fetch course {course_id}: {r.status_code}")
+        error_log.append(f"[ERROR] {course_id}: {r.status_code}")
         return None
 
 def set_course_home_to_frontpage(course_id):
@@ -42,7 +45,6 @@ def set_course_home_to_frontpage(course_id):
 #############################
 
 def main():
-    error_log = []
 
     with tqdm(total=len(df), desc="Updating courses") as pbar:
         for _, row in df.iterrows():
@@ -60,9 +62,6 @@ def main():
 
                 elif current_view == "wiki":
                     print(f"Course {course_id} already has Front Page as homepage, skipping.")
-
-                else:
-                    print(f"Course {course_id} has default_view = {current_view}, no action taken.")
 
             except Exception as e:
                 error_log.append({'course_id': course_id, 'URL': course_url, 'Error': str(e)})
