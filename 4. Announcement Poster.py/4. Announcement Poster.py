@@ -12,7 +12,7 @@ from tqdm import tqdm
 from datetime import datetime, timezone, timedelta
 start = datetime.now()
 
-with open(os.path.expanduser("~") + r'/testconfig.json') as json_data_file:
+with open(os.path.expanduser("~") + r'/config.json') as json_data_file:
     configuration = json.load(json_data_file)
     access_token = configuration["canvas"]["access_token"]
     baseurl = "https://"+configuration["canvas"]["host"]+ "/api/v1/courses/"
