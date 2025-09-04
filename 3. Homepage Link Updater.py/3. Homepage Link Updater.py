@@ -14,7 +14,7 @@ from datetime import datetime
 from bs4 import BeautifulSoup
 start = datetime.now()
 
-with open(os.path.expanduser("~") + r'/betaconfig.json') as f:
+with open(os.path.expanduser("~") + r'/config.json') as f:
     configuration = json.load(f)
     access_token = configuration["canvas"]["access_token"]
     baseUrl = "https://" + configuration["canvas"]["host"] + "/api/v1/courses/"
