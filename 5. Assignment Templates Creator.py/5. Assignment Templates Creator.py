@@ -1,13 +1,10 @@
 # Final/All Colleges/V2
 # Now working, and specifically finding just the assignments!
-# NEED TO FIX FOR WHEN COURSES ARE INVALID
-# 
 #
 # Content import from course with only Assignment Group and 5 Assignment Templates in for speed.
 # Imports into all courses in list.
 # Then Positions this Assignment Group at the top of the Assignments section. 
 # Also generates error log to show where this has been unsuccessful.
-
 
 import requests, glob, json, os, time, openpyxl
 import pandas as pd
@@ -34,7 +31,7 @@ error_log = []
 def xerox(parentcourse_id, course_id):
     """
     Import all assignments (and their assignment groups) from parent_course_id
-    into course_id. Prints workflow state on completion.
+    into course_id. Returns (success, migration_id).
     """
 
     # Create the content migration
@@ -45,22 +42,29 @@ def xerox(parentcourse_id, course_id):
         f"&selective_import=true"
     )
     preq = requests.post(posturl, headers=header)
+
+    if preq.status_code == 404:
+        print(f"[ERROR] Course {course_id} not found (404). Skipping...")
+        return False, None
     if preq.status_code != requests.codes.ok:
         print(f"[ERROR] Failed to create migration for course {course_id}: {preq.status_code}")
-        return False
+        return False, None
 
     postdata = preq.json()
-    migration_id = postdata['id']
+    migration_id = postdata.get('id')
+    if not migration_id:
+        print(f"[ERROR] No migration ID returned for course {course_id}")
+        return False, None
 
-    print('\n')
-    print(f"Migration created for course {course_id} with ID {migration_id}")
+    print(f"\nMigration created for course {course_id} with ID {migration_id}")
 
     # Select all assignments for import
     puturl = f"{baseUrl}{course_id}/content_migrations/{migration_id}?copy[all_assignments]=1"
     putreq = requests.put(puturl, headers=header)
+
     if putreq.status_code != requests.codes.ok:
         print(f"[ERROR] Failed to select assignments for course {course_id}: {putreq.status_code}")
-        return False
+        return False, migration_id
 
     putdata = putreq.json()
     workflow_state = putdata.get('workflow_state', 'unknown')
@@ -128,14 +132,16 @@ def main():
                 base_host_url = "https://" + configuration["canvas"]["host"]
                 course_url = f"{base_host_url}/courses/{course_id}"
                 error_log.append({'course_id': course_id, 'URL': course_url})
+                print('\n')
                 pbar.update(1)
-                continue  # Skip to next course
+                continue
 
             migration_success = wait_for_migration(course_id, migration_id)
             if not migration_success:
                 base_host_url = "https://" + configuration["canvas"]["host"]
                 course_url = f"{base_host_url}/courses/{course_id}"
                 error_log.append({'course_id': course_id, 'URL': course_url})
+                print('\n')
                 pbar.update(1)
                 continue
 
