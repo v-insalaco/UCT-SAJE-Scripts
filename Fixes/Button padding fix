@@ -25,21 +25,18 @@ csvfilename = csv_file[0]
 df = pd.read_csv(csvfilename, encoding='unicode_escape')
 error_log = []
 
-# Course ID to link to in Module Assessment Overview
-NEW_COURSE_ID = '82084'
 
-
-def update_frontpage_html(html, new_course_id, host):
+def update_frontpage_html(html, course_id, host):
     """Update the <a> tag with text 'Module Assessment Overview' in the front page HTML."""
     soup = BeautifulSoup(html, 'html.parser')
     changed = False
 
-    a_tag = soup.find('a', text="Module Assessment Overview")
+    a_tag = soup.find('a', string="Module Assessment Overview")
     if a_tag:
         a_tag['style'] = 'padding: 2em 0; height: 100%;'
         a_tag['title'] = 'Module Assessment Overview'
-        a_tag['href'] = f"https://{host}/courses/{new_course_id}/pages/module-assessment-overview-coss"
-        a_tag['data-api-endpoint'] = f"https://{host}/api/v1/courses/{new_course_id}/pages/module-assessment-overview-coss"
+        a_tag['href'] = f"https://{host}/courses/{course_id}/pages/module-assessment-overview-coss"
+        a_tag['data-api-endpoint'] = f"https://{host}/api/v1/courses/{course_id}/pages/module-assessment-overview-coss"
         changed = True
 
     return str(soup), changed
@@ -57,7 +54,7 @@ def update_front_page(course_id):
     page_data = r.json()
     html = page_data.get('body', '')
 
-    updated_html, changed = update_frontpage_html(html, NEW_COURSE_ID, configuration['canvas']['host'])
+    updated_html, changed = update_frontpage_html(html, course_id, configuration['canvas']['host'])
 
     if changed:
         payload = {'wiki_page[body]': updated_html}
