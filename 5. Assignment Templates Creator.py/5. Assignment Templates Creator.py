@@ -75,7 +75,7 @@ def xerox(parentcourse_id, course_id):
 def wait_for_migration(course_id, migration_id):
 
     print(f"Waiting for migration in {course_id}...")
-    time.sleep(8) # no point checking straight away. But should we wait 40 seconds?
+    time.sleep(10)
 
     url = f"{baseUrl}{course_id}/content_migrations/{migration_id}"
     while True:
@@ -120,7 +120,7 @@ def move_assignment_group_to_top(course_id, group_name):
 
 def main():
 
-    parentcourse_id = 83108
+    parentcourse_id = input('Please enter the parent_course id: (e.g. 83815):\n')
     group_name = "Assignment Templates"
 
     with tqdm(total=len(list(df.iterrows()))) as pbar:
