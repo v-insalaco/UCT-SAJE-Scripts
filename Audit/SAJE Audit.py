@@ -1,3 +1,4 @@
+# Script to report on the 6 questions required for the SAJE Audit
 
 import requests, json, os, glob
 import pandas as pd
@@ -6,10 +7,6 @@ from datetime import datetime
 from openpyxl import load_workbook
 from openpyxl.utils import get_column_letter
 from openpyxl.styles import PatternFill
-
-# -------------------------
-# Start timer
-# -------------------------
 start = datetime.now()
 
 with open(os.path.expanduser("~") + r'/testconfig.json') as json_data_file:
@@ -23,7 +20,6 @@ if len(csv_file) != 1:
 csvfilename = csv_file[0]
 if not os.path.exists(csvfilename):
     raise FileNotFoundError(f"CSV file '{csvfilename}' not found.")
-
 pd.options.mode.chained_assignment = None
 
 df_courses = pd.read_csv(csvfilename, encoding='utf-8')
@@ -36,8 +32,6 @@ if 'course_id' not in df_courses.columns:
 
 output_file = os.path.join(os.getcwd(), "assessment_overview_audit.xlsx")
 
-# -------------------------
-# Helpers
 # -------------------------
 def safe_get(url, params=None):
     try:
