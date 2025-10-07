@@ -86,7 +86,7 @@ def get_course_info(course_id):
 
     return {
         "Course_ID": course_id,
-        "Course_url": f"https://{configuration["canvas"]["host"]}/courses/{course_id}",
+        "Course_url": f"https://{configuration["canvas"]["host"]}/courses/{course_id}/pages/module-assessment-overview",
         "Long_name": data.get("name", ""),
         "Sub_account": sis_account_id,
         "Course_Published": "Yes" if data.get("workflow_state") == "available" else "No"
@@ -171,11 +171,10 @@ def check_homepage_link(course_id):
 def check_module_block(course_id, page):
     mods = paginate(f"{baseUrl}courses/{course_id}/modules")
     if not mods:
-        return "No module"
+        return "N/A"
+
     for m in mods:
         if m.get("name", "").strip().lower() == "module assessment overview":
-            published = "Published" if m.get("published") else "Unpublished"
-            # check items
             items = paginate(f"{baseUrl}courses/{course_id}/modules/{m['id']}/items")
             found = False
             if page:
@@ -183,8 +182,11 @@ def check_module_block(course_id, page):
                     if str(page.get("url", "")).endswith(it.get("page_url", "")):
                         found = True
                         break
-            return ("Yes" if found else "No") + f" - {published}"
-    return "No module"
+
+            # Must be both found and published to return Yes
+            return "Yes" if found and m.get("published") else "No"
+
+    return "N/A"
 
 def get_page_updated(page):
     if not page:
@@ -230,7 +232,7 @@ def main():
             page = get_module_assessment_page(course_id)
             info["Page_Available"] = "Yes" if page else "No"
             info["Homepage_Link"] = check_homepage_link(course_id)
-            info["Page_Published"] = page.get("published", False) if page else "N/A"
+            info["Page_Published"] = "Yes" if page and page.get("published", False) else "No" if page else "N/A"
             info["Module_Published"] = check_module_block(course_id, page)
             info["Page_Updated"] = get_page_updated(page)
 
