@@ -1,15 +1,19 @@
 # Script to report on the 6 questions required for the SAJE Audit
+# Working to get good results for all questions
+# Last question may need some eyeballing to infer page updates at current as it shows last editor
 
 import requests, json, os, glob
 import pandas as pd
 from tqdm import tqdm
+from bs4 import BeautifulSoup
 from datetime import datetime
+import pytz
 from openpyxl import load_workbook
 from openpyxl.utils import get_column_letter
 from openpyxl.styles import PatternFill
 start = datetime.now()
 
-with open(os.path.expanduser("~") + r'/testconfig.json') as json_data_file:
+with open(os.path.expanduser("~") + r'/config.json') as json_data_file:
     configuration = json.load(json_data_file)
 access_token = configuration["canvas"]["access_token"]
 baseUrl = "https://" + configuration["canvas"]["host"] + "/api/v1/"
@@ -82,7 +86,7 @@ def get_course_info(course_id):
 
     return {
         "Course_ID": course_id,
-        "Course_url": f"https://canvas.bham.ac.uk/courses/{course_id}",
+        "Course_url": f"https://{configuration["canvas"]["host"]}/courses/{course_id}",
         "Long_name": data.get("name", ""),
         "Sub_account": sis_account_id,
         "Course_Published": "Yes" if data.get("workflow_state") == "available" else "No"
@@ -102,14 +106,67 @@ def get_module_assessment_page(course_id):
     return None
 
 def check_homepage_link(course_id):
-    url = f"{baseUrl}courses/{course_id}/front_page"
-    page = safe_get(url)
-    if not page or not page.get("body"):
+
+    """Determines the homepage type (wiki or syllabus) for a course and searches
+    for a 'Module Assessment Overview' link pointing to the correct page."""
+
+    try:
+        # 1. Identify homepage type
+        course_url = f"{baseUrl}courses/{course_id}"
+        course_data = safe_get(course_url)
+        if not course_data:
+            print(f"[{course_id}] Failed to fetch course data")
+            return "No"
+
+        default_view = course_data.get("default_view", "unknown")
+        print(f"[{course_id}] Homepage type: {default_view}")
+
+        # 2. Fetch the homepage HTML depending on type
+        html = ""
+        if default_view == "wiki":
+            front_page_url = f"{baseUrl}courses/{course_id}/front_page"
+            page = safe_get(front_page_url)
+            if page and page.get("body"):
+                html = page["body"]
+            else:
+                print(f"[{course_id}] No front page found")
+                return "No"
+
+        elif default_view == "syllabus":
+            syllabus_url = f"{baseUrl}courses/{course_id}?include[]=syllabus_body"
+            syllabus = safe_get(syllabus_url)
+            if syllabus and syllabus.get("syllabus_body"):
+                html = syllabus["syllabus_body"]
+            else:
+                print(f"[{course_id}] No syllabus body found")
+                return "No"
+
+        else:
+            # e.g. modules or assignments page – not an HTML homepage
+            print(f"[{course_id}] Non-HTML homepage type ({default_view}), skipping.")
+            return "No"
+
+        if not html.strip():
+            print(f"[{course_id}] Empty homepage HTML")
+            return "No"
+        
+        # 3. Parse and look for the target link
+        soup = BeautifulSoup(html, "html.parser")
+        for a in soup.find_all("a", href=True):
+            href = a["href"].lower()
+            if ("module-assessment-overview" in href):
+                print(f"[{course_id}] Found valid link: {href}")
+                return "Yes"
+
+        print(f"[{course_id}] No matching Module Assessment Overview link found.")
+        
         return "No"
-    body = page.get("body", "").lower()
-    if "module-assessment-overview" in body:
-        return "Yes"
-    return "No"
+
+    except Exception as e:
+        print(f"[{course_id}] Exception in check_homepage_link: {e}")
+        
+        return "No"
+    
 
 def check_module_block(course_id, page):
     mods = paginate(f"{baseUrl}courses/{course_id}/modules")
@@ -132,11 +189,24 @@ def check_module_block(course_id, page):
 def get_page_updated(page):
     if not page:
         return "N/A"
+
     author = ""
     if page.get("last_edited_by"):
         author = page["last_edited_by"].get("display_name", "")
-    updated = page.get("updated_at", "")
-    return f"{author} - {updated}" if author or updated else "N/A"
+
+    updated_raw = page.get("updated_at", "")
+    if not updated_raw:
+        return author if author else "N/A"
+
+    try:
+        # Canvas timestamps are UTC, e.g. 2025-10-03T10:55:12Z
+        utc_dt = datetime.strptime(updated_raw, "%Y-%m-%dT%H:%M:%SZ")
+        london_tz = pytz.timezone("Europe/London")
+        london_dt = pytz.utc.localize(utc_dt).astimezone(london_tz)
+        formatted_time = london_dt.strftime("%d/%m/%y %H:%M:%S")
+        return f"{author} - {formatted_time}" if author else formatted_time
+    except Exception:
+        return author if author else "N/A"
 
 # -------------------------
 # Main
@@ -151,7 +221,6 @@ def main():
             
             print('\n')
             print("Auditing:", course_id)
-            print('\n')
 
             info = get_course_info(course_id)
             if not info:
