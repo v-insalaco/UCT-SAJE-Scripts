@@ -1,10 +1,11 @@
-# Final/All Colleges/V1
+# Final/All Colleges/V2
 # 3. Homepage Link Updater
 # 
-# Find the homepage or front page of a course that’s used as the chosen homepage,
+# Find the homepage or front page of a course that's used as the chosen homepage,
 # and on this identified page find the link/button link text from the template discovery task loaded via text file
 # that corresponds with how this College, School or Department deals with Module Assessment/Assessment & Feedback.
 # Change this to point to the Module Assessment Overview wikipage.
+# Now checks whether module-assessment-overview-2 exists first; if so, links there instead.
 # Error log created for invalid courses.
 
 import requests, glob, json, os, re, openpyxl
@@ -44,6 +45,37 @@ def load_link_replacements(filename="link_replacements.txt"):
     return replacements
 
 LINK_REPLACEMENTS = load_link_replacements()
+
+# Cache for page existence checks so we don't re-query the same course
+_page_exists_cache = {}
+
+def check_page_exists(course_id, page_slug):
+    """Check whether a specific wiki page exists in a course. Results are cached."""
+    cache_key = (course_id, page_slug)
+    if cache_key in _page_exists_cache:
+        return _page_exists_cache[cache_key]
+
+    url = baseUrl + f"{course_id}/pages/{page_slug}"
+    r = requests.get(url, headers=header)
+    exists = r.status_code == requests.codes.ok
+    _page_exists_cache[cache_key] = exists
+    return exists
+
+def resolve_assessment_page(course_id):
+    """
+    Determine which Module Assessment Overview page to link to for a given course.
+    Returns the page slug to use: 'module-assessment-overview-2' if it exists,
+    otherwise 'module-assessment-overview'.
+    """
+    preferred = "module-assessment-overview-2"
+    fallback = "module-assessment-overview"
+
+    if check_page_exists(course_id, preferred):
+        print(f"   ✅ Page '{preferred}' found in course {course_id} — using it.")
+        return preferred
+    else:
+        print(f"   ℹ️ Page '{preferred}' not found in course {course_id} — falling back to '{fallback}'.")
+        return fallback
 
 def extract_styles_from_element(element):
     font_size = None
@@ -101,7 +133,9 @@ def update_links_in_html(html, course_id):
     changed = False
 
     print(f"\n--- Checking links in course {course_id} HTML ---")
-    
+
+    # Resolve which assessment page to use for this course (checked once per course)
+    target_page_slug = resolve_assessment_page(course_id)
 
     for a in soup.find_all("a", href=True):
         print(f"Checking link: {a['href']}")
@@ -109,12 +143,20 @@ def update_links_in_html(html, course_id):
         for old_pattern, new_path in LINK_REPLACEMENTS.items():
             if old_pattern.lower() in href_lower:
                 print(f"Matched old pattern: {old_pattern}")
-                if new_path.startswith("/"):
-                    new_href = f"{webBaseUrl}{course_id}{new_path}"
-                elif new_path.startswith("http"):
-                    new_href = new_path
+
+                # Replace the page slug in the new_path with the resolved target
+                # e.g. "/pages/module-assessment-overview" → "/pages/module-assessment-overview-2"
+                adjusted_new_path = new_path.replace(
+                    "module-assessment-overview",
+                    target_page_slug
+                )
+
+                if adjusted_new_path.startswith("/"):
+                    new_href = f"{webBaseUrl}{course_id}{adjusted_new_path}"
+                elif adjusted_new_path.startswith("http"):
+                    new_href = adjusted_new_path
                 else:
-                    new_href = f"{webBaseUrl}{course_id}/{new_path}"
+                    new_href = f"{webBaseUrl}{course_id}/{adjusted_new_path}"
 
                 parent_div = a.find_parent("div")
                 font_size, color, is_bold = extract_styles_from_element(a)
@@ -129,13 +171,16 @@ def update_links_in_html(html, course_id):
                 if style_parts:
                     a['style'] = "; ".join(style_parts)
 
+                # Set the display text based on which page we're linking to
+                display_text = "Module Assessment Overview"
+
                 if is_bold:
                     a.clear()
                     bold_tag = soup.new_tag("strong")
-                    bold_tag.string = "Module Assessment Overview"
+                    bold_tag.string = display_text
                     a.append(bold_tag)
                 else:
-                    a.string = "Module Assessment Overview"
+                    a.string = display_text
 
                 print(f"Updated link to: {a['href']} with style: {a.get('style', '')}")
                 changed = True
